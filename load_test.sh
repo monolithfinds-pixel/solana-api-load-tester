@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# 1. Install official Solana CLI
-echo "Installing Solana CLI..."
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.4/install)"
-export PATH="/home/runner/.local/share/solana/install/active_release/bin:$PATH"
+# 1. Download Solana CLI directly (Bypasses curl SSL errors)
+echo "Downloading Solana CLI..."
+wget -q https://release.solana.com/v1.18.4/solana-release-x86_64-unknown-linux-gnu.tar.bz2 -O solana.tar.bz2
+tar jxf solana.tar.bz2
+export PATH="/home/runner/solana-release/bin:$PATH"
 
 # 2. Configure to use Devnet (Free test network)
 echo "Configuring Devnet..."
