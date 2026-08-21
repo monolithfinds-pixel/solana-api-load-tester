@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install Dependencies
-        run: pip install solana solders requests
+        run: pip install solders requests
       - name: Run Farming Bot
         run: python bot.py
         env:
