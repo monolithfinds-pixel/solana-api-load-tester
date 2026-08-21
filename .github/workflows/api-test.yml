@@ -1,0 +1,15 @@
+name: Solana API Load Test
+on:
+  schedule:
+    - cron: "0 */12 * * *"  # Runs automatically every 12 hours
+  workflow_dispatch: # Allows you to run it manually right now
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run API Load Test
+        run: bash load_test.sh
+        env:
+          SOL_PRIVATE_KEY: ${{ secrets.SOL_PRIVATE_KEY }}
