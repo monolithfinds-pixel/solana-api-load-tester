@@ -19,3 +19,4 @@ jobs:
         run: python bot.py
         env:
           SOL_PRIVATE_KEY: ${{ secrets.SOL_PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}
