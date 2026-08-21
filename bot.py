@@ -17,7 +17,9 @@ else:
 
 kp = Keypair.from_bytes(key_bytes)
 pubkey = kp.pubkey()
-RPC_URL = "https://api.devnet.solana.com"
+
+# 2. Use VIP Helius RPC (Bypasses GitHub IP ban)
+RPC_URL = os.environ.get("RPC_URL", "https://api.devnet.solana.com")
 
 def rpc_call(method, params=None):
     payload = {"jsonrpc": "2.0", "id": 1, "method": method}
@@ -25,18 +27,18 @@ def rpc_call(method, params=None):
     r = requests.post(RPC_URL, json=payload)
     return r.json()
 
-# 2. Claim Free SOL
+# 3. Claim Free SOL
 print(f"Connected to Devnet. Wallet: {pubkey}")
 print("Requesting Airdrop 1 SOL...")
 rpc_call("requestAirdrop", [str(pubkey), 1000000000])
 time.sleep(10)
 
-# 3. Check Balance
+# 4. Check Balance
 resp = rpc_call("getBalance", [str(pubkey)])
 balance = resp.get("result", {}).get("value", 0)
 print(f"Current Balance: {balance / 1000000000} SOL")
 
-# 4. Farm Volume
+# 5. Farm Volume
 if balance > 0:
     print("Starting API Load Test (Volume Farm)...")
     for i in range(30):
@@ -49,7 +51,7 @@ if balance > 0:
             # Create transfer instruction
             ix = transfer(TransferParams(from_pubkey=pubkey, to_pubkey=pubkey, lamports=1000000))
             
-            # THE FIX: Use new_signed_with_payer
+            # Sign transaction
             tx = Transaction.new_signed_with_payer([ix], pubkey, [kp], blockhash)
             
             # Serialize and send
