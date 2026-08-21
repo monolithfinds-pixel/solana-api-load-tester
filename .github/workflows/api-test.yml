@@ -13,8 +13,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install Solana Python Library
-        run: pip install solana solders
+      - name: Install Dependencies
+        run: pip install solders requests
       - name: Run Farming Bot
         run: python bot.py
         env:
