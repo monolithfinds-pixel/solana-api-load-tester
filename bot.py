@@ -8,58 +8,83 @@ from solders.system_program import TransferParams, transfer
 from solders.transaction import Transaction
 from solders.hash import Hash
 
-# 1. Load Private Key
-key_str = os.environ.get("SOL_PRIVATE_KEY")
-if key_str.startswith('['):
-    key_bytes = bytes(json.loads(key_str))
-else:
-    key_bytes = key_str.encode()
+# Load Secrets
+keys_str = os.environ.get("SOL_PRIVATE_KEYS")
+rpcs_str = os.environ.get("HELIUS_RPC_URLS")
 
-kp = Keypair.from_bytes(key_bytes)
-pubkey = kp.pubkey()
+if not keys_str or not rpcs_str:
+    print("ERROR: Missing secrets. Ensure SOL_PRIVATE_KEYS and HELIUS_RPC_URLS are set.")
+    exit()
 
-# 2. Use VIP Helius RPC
-RPC_URL = os.environ.get("RPC_URL", "https://api.devnet.solana.com")
+# Parse the 50 wallets
+try:
+    wallets = json.loads(keys_str)
+    if not isinstance(wallets[0], list):
+        wallets = [wallets] # Fallback if only 1 key
+except:
+    print("Error parsing wallet keys.")
+    exit()
 
-def rpc_call(method, params=None):
+# Parse the 10 Helius RPCs
+rpcs = [r.strip() for r in rpcs_str.split(',') if r.strip()]
+if not rpcs:
+    print("Error parsing RPC URLs.")
+    exit()
+
+def rpc_call(rpc_url, method, params=None):
     payload = {"jsonrpc": "2.0", "id": 1, "method": method}
     if params: payload["params"] = params
-    r = requests.post(RPC_URL, json=payload)
+    r = requests.post(rpc_url, json=payload)
     return r.json()
 
-# 3. Claim Free SOL
-print(f"Using RPC: {RPC_URL}")
-print(f"Connected to Devnet. Wallet: {pubkey}")
-print("Requesting Airdrop 1 SOL...")
-airdrop_resp = rpc_call("requestAirdrop", [str(pubkey), 1000000000])
-print(f"Airdrop Response: {airdrop_resp}") # <-- THIS WILL SHOW THE EXACT ERROR
+print(f"=== SOlana Matrix Farm Started ({len(wallets)} Wallets, {len(rpcs)} RPCs) ===")
 
-time.sleep(10)
+# Loop through all 50 wallets
+for idx, key_data in enumerate(wallets):
+    # Assign an RPC to this wallet (Round-robin style: Wallet 0 uses RPC 0, Wallet 10 uses RPC 0 again)
+    rpc_url = rpcs[idx % len(rpcs)]
+    
+    try:
+        kp = Keypair.from_bytes(bytes(key_data))
+    except Exception as e:
+        print(f"Wallet {idx+1}: Invalid key format. Skipping.")
+        continue
+        
+    pubkey = kp.pubkey()
+    print(f"\n--- Wallet {idx+1}/{len(wallets)} | Using RPC {idx % len(rpcs) + 1} ---")
+    print(f"Address: {pubkey}")
+    
+    # 1. Request Airdrop (1 SOL)
+    air_resp = rpc_call(rpc_url, "requestAirdrop", [str(pubkey), 1000000000])
+    if "error" in air_resp:
+        print(f"Airdrop failed: {air_resp['error']['message']}")
+        continue
+        
+    time.sleep(5)
+    
+    # 2. Check Balance
+    bal_resp = rpc_call(rpc_url, "getBalance", [str(pubkey)])
+    balance = bal_resp.get("result", {}).get("value", 0)
+    print(f"Balance: {balance / 1000000000} SOL")
+    
+    # 3. Farm Volume (10 transactions per wallet to keep it fast and avoid rate limits)
+    if balance > 0:
+        for i in range(10):
+            try:
+                bh_resp = rpc_call(rpc_url, "getLatestBlockhash")
+                blockhash_str = bh_resp["result"]["value"]["blockhash"]
+                blockhash = Hash.from_string(blockhash_str)
+                
+                ix = transfer(TransferParams(from_pubkey=pubkey, to_pubkey=pubkey, lamports=1000000))
+                tx = Transaction.new_signed_with_payer([ix], pubkey, [kp], blockhash)
+                
+                tx_b64 = base64.b64encode(bytes(tx)).decode("utf-8")
+                send_resp = rpc_call(rpc_url, "sendTransaction", [tx_b64, {"encoding": "base64"}])
+                print(f"  Tx {i+1}/10 sent!")
+            except Exception as e:
+                print(f"  Tx {i+1}/10 failed: {e}")
+            time.sleep(2)
+    else:
+        print("  Skipping (No balance).")
 
-# 4. Check Balance
-resp = rpc_call("getBalance", [str(pubkey)])
-print(f"Balance Response: {resp}")
-balance = resp.get("result", {}).get("value", 0)
-print(f"Current Balance: {balance / 1000000000} SOL")
-
-# 5. Farm Volume
-if balance > 0:
-    print("Starting API Load Test (Volume Farm)...")
-    for i in range(30):
-        try:
-            bh_resp = rpc_call("getLatestBlockhash")
-            blockhash_str = bh_resp["result"]["value"]["blockhash"]
-            blockhash = Hash.from_string(blockhash_str)
-            
-            ix = transfer(TransferParams(from_pubkey=pubkey, to_pubkey=pubkey, lamports=1000000))
-            tx = Transaction.new_signed_with_payer([ix], pubkey, [kp], blockhash)
-            
-            tx_b64 = base64.b64encode(bytes(tx)).decode("utf-8")
-            send_resp = rpc_call("sendTransaction", [tx_b64, {"encoding": "base64"}])
-            print(f"Transaction {i+1}/30 sent! Hash: {send_resp.get('result')}")
-        except Exception as e:
-            print(f"Transaction {i+1}/30 failed: {e}")
-        time.sleep(3)
-    print("Load test complete.")
-else:
-    print("Airdrop failed. See error above.")
+print("\n=== Matrix Run Complete ===")
