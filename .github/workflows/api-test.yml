@@ -1,11 +1,11 @@
-name: Solana API Load Test
+name: Multi-Chain Matrix
 on:
   schedule:
     - cron: "0 */12 * * *"  # Runs automatically every 12 hours
   workflow_dispatch:
 
 jobs:
-  test:
+  matrix:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,8 +15,8 @@ jobs:
           python-version: '3.11'
       - name: Install Dependencies
         run: pip install solders requests
-      - name: Run Farming Bot
-        run: python bot.py
+      - name: Run Matrix Bot
+        run: python matrix.py
         env:
-          SOL_PRIVATE_KEY: ${{ secrets.SOL_PRIVATE_KEY }}
-          RPC_URL: ${{ secrets.RPC_URL }}
+          SOL_PRIVATE_KEYS: ${{ secrets.SOL_PRIVATE_KEYS }}
+          HELIUS_RPC_URLS: ${{ secrets.HELIUS_RPC_URLS }}
